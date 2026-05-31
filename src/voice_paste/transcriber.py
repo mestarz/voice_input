@@ -10,6 +10,42 @@ from pathlib import Path
 from voice_paste.config import Config
 
 
+_IGNORED_CHARS = str.maketrans(
+    "",
+    "",
+    " \t\r\n，。？！、,.!?;；:：\"'“”‘’（）()[]【】《》<>-—_…",
+)
+
+_COMMON_EMPTY_AUDIO_HALLUCINATIONS = {
+    "点点关注",
+    "点赞关注",
+    "点赞加关注",
+    "谢谢观看",
+    "感谢观看",
+    "欢迎收看",
+}
+
+_PROMPT_LEAK_MARKERS = (
+    "以下是普通话的句子",
+    "请根据语气正确使用",
+    "逗号句号问号感叹号等标点符号",
+)
+
+
+def _normalize_text(text: str) -> str:
+    return text.translate(_IGNORED_CHARS)
+
+
+def _looks_like_hallucination(text: str) -> bool:
+    normalized = _normalize_text(text)
+    if normalized in _COMMON_EMPTY_AUDIO_HALLUCINATIONS:
+        return True
+    return (
+        len(normalized) <= 60
+        and any(marker in normalized for marker in _PROMPT_LEAK_MARKERS)
+    )
+
+
 class Transcriber:
     def __init__(self, config: Config) -> None:
         self.config = config
@@ -62,4 +98,7 @@ class Transcriber:
             vad_filter=True,
         )
         text = "".join(seg.text for seg in segments)
-        return text.strip()
+        text = text.strip()
+        if _looks_like_hallucination(text):
+            return ""
+        return text
