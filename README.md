@@ -152,10 +152,8 @@ bind = SUPER, SPACE, exec, voice-paste toggle
 model = "large-v3"      # tiny/base/small/medium/large-v3
 device = "auto"          # auto / cuda / cpu
 compute_type = "default" # default / float16 / int8_float16 / int8
-language = "zh"          # 留空字符串表示自动检测；中英混说可设为 ""
+language = "zh"          # 留空字符串表示自动检测
 beam_size = 5
-hotwords = ""            # 热词提示，如 "GitHub OpenAI systemd"
-initial_prompt = ""      # 默认关闭；它是转写上下文，不是命令提示词
 
 sample_rate = 16000
 channels = 1
