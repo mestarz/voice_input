@@ -8,8 +8,13 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from pathlib import Path
+
+
+LEGACY_INSTRUCTION_PROMPTS = {
+    "以下是普通话的句子，请根据语气正确使用逗号、句号、问号、感叹号等标点符号。",
+}
 
 
 def config_home() -> Path:
@@ -29,9 +34,10 @@ class Config:
     compute_type: str = "default"  # default / float16 / int8_float16 / int8
     language: str = "zh"  # 识别语言，None 表示自动检测
     beam_size: int = 5
-    # 引导提示：给一段带标点的中文示例可显著提升标点/数字格式输出。
-    # 留空字符串表示不使用。
-    initial_prompt: str = "以下是普通话的句子，请根据语气正确使用逗号、句号、问号、感叹号等标点符号。"
+    hotwords: str = ""  # 热词提示，适合 GitHub/OpenAI/systemd 等中英混说词
+    # Whisper 的 initial_prompt 是转写上下文，不是命令提示词。
+    # 默认关闭，避免静音/弱语音时把提示词本身识别出来。
+    initial_prompt: str = ""
     download_root: str | None = None  # 模型缓存目录，None 用 HF 默认
 
     # 录音
@@ -62,6 +68,8 @@ def load_config() -> Config:
             with path.open("rb") as fh:
                 data = tomllib.load(fh)
             cfg = cfg.merged(data)
+            if cfg.initial_prompt in LEGACY_INSTRUCTION_PROMPTS:
+                cfg.initial_prompt = ""
         except (OSError, tomllib.TOMLDecodeError) as exc:  # pragma: no cover
             print(f"[voice-paste] 配置文件解析失败，使用默认配置: {exc}")
     return cfg
@@ -77,8 +85,10 @@ device = "auto"          # auto / cuda / cpu
 compute_type = "default" # default / float16 / int8_float16 / int8
 language = "zh"          # 识别语言；留空字符串表示自动检测
 beam_size = 5
-# 引导提示：带标点的中文示例可提升标点输出。留空字符串则不使用。
-initial_prompt = "以下是普通话的句子，请根据语气正确使用逗号、句号、问号、感叹号等标点符号。"
+hotwords = ""            # 热词提示，如 "GitHub OpenAI systemd"
+# Whisper 的 initial_prompt 是转写上下文，不是命令提示词。
+# 如需引导标点风格，应写成自然的中文样例；留空字符串表示不使用。
+initial_prompt = ""
 
 # ---- 录音 ----
 sample_rate = 16000
