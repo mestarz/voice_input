@@ -1,0 +1,27 @@
+[project]
+name = "voice-paste"
+version = "0.1.0"
+description = "本地语音输入助手：快捷键录音 → 本地识别 → 自动粘贴到当前输入框"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "faster-whisper>=1.0.0",
+]
+
+[project.optional-dependencies]
+# NVIDIA GPU(CUDA 12) 加速所需运行库；ctranslate2 需要 libcublas.so.12 与 libcudnn.so.9。
+# 系统若仅有 CUDA 13，可安装此组：  uv tool install . --extra cuda12
+cuda12 = [
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12>=9,<10",
+]
+
+[project.scripts]
+voice-paste = "voice_paste.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/voice_paste"]

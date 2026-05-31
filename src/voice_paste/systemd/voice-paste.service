@@ -1,0 +1,19 @@
+[Unit]
+Description=Voice Paste 本地语音输入助手后台服务
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/voice-paste daemon
+Restart=on-failure
+RestartSec=3
+# 首次启动需联网下载模型。若 huggingface.co 不可直连（如国内网络），
+# 取消下面注释并填入你的代理；或改用镜像 HF_ENDPOINT=https://hf-mirror.com
+#Environment=http_proxy=http://127.0.0.1:7890
+#Environment=https_proxy=http://127.0.0.1:7890
+#Environment=no_proxy=localhost,127.0.0.1
+#Environment=HF_ENDPOINT=https://hf-mirror.com
+
+[Install]
+WantedBy=graphical-session.target
