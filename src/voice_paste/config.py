@@ -29,6 +29,9 @@ class Config:
     compute_type: str = "default"  # default / float16 / int8_float16 / int8
     language: str = "zh"  # 识别语言，None 表示自动检测
     beam_size: int = 5
+    # 引导提示：给一段带标点的中文示例可显著提升标点/数字格式输出。
+    # 留空字符串表示不使用。
+    initial_prompt: str = "以下是普通话的句子，请根据语气正确使用逗号、句号、问号、感叹号等标点符号。"
     download_root: str | None = None  # 模型缓存目录，None 用 HF 默认
 
     # 录音
@@ -74,6 +77,8 @@ device = "auto"          # auto / cuda / cpu
 compute_type = "default" # default / float16 / int8_float16 / int8
 language = "zh"          # 识别语言；留空字符串表示自动检测
 beam_size = 5
+# 引导提示：带标点的中文示例可提升标点输出。留空字符串则不使用。
+initial_prompt = "以下是普通话的句子，请根据语气正确使用逗号、句号、问号、感叹号等标点符号。"
 
 # ---- 录音 ----
 sample_rate = 16000

@@ -58,6 +58,7 @@ class Transcriber:
             str(wav_path),
             language=language,
             beam_size=self.config.beam_size,
+            initial_prompt=self.config.initial_prompt or None,
             vad_filter=True,
         )
         text = "".join(seg.text for seg in segments)
