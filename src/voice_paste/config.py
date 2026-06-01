@@ -39,6 +39,12 @@ class Config:
     channels: int = 1
     max_seconds: int = 300  # 录音安全上限，超时自动停止
 
+    # VAD（语音活动检测）：过滤静音段，避免空音频幻觉。
+    # 默认值较默认 VAD 更宽松，减少短句/轻声被整段切掉导致的“识别失败”。
+    vad_filter: bool = True
+    vad_min_silence_ms: int = 300  # 判定为静音切分的最短时长（越大越不易切断）
+    vad_speech_pad_ms: int = 200   # 语音段前后保留的填充，避免吃掉首尾字
+
     # 粘贴
     paste_method: str = "auto"  # auto / wtype / ydotool / clipboard
     paste_key: str = "shift+insert"  # shift+insert / ctrl+v / ctrl+shift+v
@@ -84,6 +90,12 @@ initial_prompt = "以下是普通话的句子，请根据语气正确使用逗�
 sample_rate = 16000
 channels = 1
 max_seconds = 300
+
+# ---- VAD（语音活动检测）----
+# 过滤静音以减少空音频幻觉；放宽参数可减少短句被误切导致的“识别失败”。
+vad_filter = true
+vad_min_silence_ms = 300   # 静音切分最短时长，越大越不易切断语音
+vad_speech_pad_ms = 200    # 语音段前后填充，避免吃掉首尾字
 
 # ---- 粘贴 ----
 paste_method = "auto"    # auto / wtype / ydotool / clipboard

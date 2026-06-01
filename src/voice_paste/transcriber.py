@@ -5,9 +5,25 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from voice_paste.config import Config
+
+
+@dataclass
+class TranscribeResult:
+    """识别结果。
+
+    status:
+      - "ok"            正常识别到文本
+      - "empty"         没有有效语音（真·空音频 / VAD 切空 / 太短）
+      - "hallucination" 识别出空音频幻觉短语，已忽略
+    """
+
+    text: str
+    raw: str
+    status: str
 
 
 _IGNORED_CHARS = str.maketrans(
@@ -36,9 +52,7 @@ _HALLUCINATION_SUBSTRINGS = (
     "点赞订阅转发打赏",
     "打赏支持明镜",
     "明镜与点点栏目",
-    "与点点栏目",
-    "请订阅",
-    "字幕由",
+    "明镜与点点",
 )
 
 
@@ -98,19 +112,25 @@ class Transcriber:
         device, compute = self._resolve_device()
         return f"{device}/{compute}"
 
-    def transcribe(self, wav_path: Path) -> str:
+    def transcribe(self, wav_path: Path) -> TranscribeResult:
         self.load()
         assert self._model is not None
         language = self.config.language or None
-        segments, _info = self._model.transcribe(
-            str(wav_path),
-            language=language,
-            beam_size=self.config.beam_size,
-            initial_prompt=self.config.initial_prompt or None,
-            vad_filter=True,
-        )
-        text = "".join(seg.text for seg in segments)
-        text = text.strip()
-        if _looks_like_hallucination(text):
-            return ""
-        return text
+        transcribe_kwargs = {
+            "language": language,
+            "beam_size": self.config.beam_size,
+            "initial_prompt": self.config.initial_prompt or None,
+            "vad_filter": self.config.vad_filter,
+        }
+        if self.config.vad_filter:
+            transcribe_kwargs["vad_parameters"] = {
+                "min_silence_duration_ms": self.config.vad_min_silence_ms,
+                "speech_pad_ms": self.config.vad_speech_pad_ms,
+            }
+        segments, _info = self._model.transcribe(str(wav_path), **transcribe_kwargs)
+        raw = "".join(seg.text for seg in segments).strip()
+        if not raw:
+            return TranscribeResult(text="", raw=raw, status="empty")
+        if _looks_like_hallucination(raw):
+            return TranscribeResult(text="", raw=raw, status="hallucination")
+        return TranscribeResult(text=raw, raw=raw, status="ok")

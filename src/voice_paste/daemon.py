@@ -229,7 +229,7 @@ class Daemon:
 
         try:
             notify("正在识别…", enabled=self.config.notifications)
-            text = self.transcriber.transcribe(wav)
+            result = self.transcriber.transcribe(wav)
         except Exception as exc:  # noqa: BLE001
             self.last_error = str(exc)
             notify(f"识别失败: {exc}", urgency="critical",
@@ -239,12 +239,22 @@ class Daemon:
         finally:
             wav.unlink(missing_ok=True)
 
-        if not text:
+        if result.status == "hallucination":
             self.last_text = ""
-            notify("没有识别到文本", enabled=self.config.notifications)
+            self.last_error = f"疑似空音频幻觉，已忽略：{result.raw}"
+            notify("疑似空音频幻觉，已忽略（未检测到有效语音）",
+                   enabled=self.config.notifications)
             self.state = STATE_IDLE
             return
 
+        if result.status != "ok" or not result.text:
+            self.last_text = ""
+            notify("没听到声音，请靠近麦克风或说久一点再试",
+                   enabled=self.config.notifications)
+            self.state = STATE_IDLE
+            return
+
+        text = result.text
         self.last_text = text
         result = paste_text(
             text,
