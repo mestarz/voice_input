@@ -31,6 +31,16 @@ _PROMPT_LEAK_MARKERS = (
     "逗号句号问号感叹号等标点符号",
 )
 
+_HALLUCINATION_SUBSTRINGS = (
+    "请不吝点赞",
+    "点赞订阅转发打赏",
+    "打赏支持明镜",
+    "明镜与点点栏目",
+    "与点点栏目",
+    "请订阅",
+    "字幕由",
+)
+
 
 def _normalize_text(text: str) -> str:
     return text.translate(_IGNORED_CHARS)
@@ -39,6 +49,8 @@ def _normalize_text(text: str) -> str:
 def _looks_like_hallucination(text: str) -> bool:
     normalized = _normalize_text(text)
     if normalized in _COMMON_EMPTY_AUDIO_HALLUCINATIONS:
+        return True
+    if any(sub in normalized for sub in _HALLUCINATION_SUBSTRINGS):
         return True
     return (
         len(normalized) <= 60
