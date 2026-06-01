@@ -60,11 +60,14 @@ def _normalize_text(text: str) -> str:
     return text.translate(_IGNORED_CHARS)
 
 
-def _looks_like_hallucination(text: str) -> bool:
+def _looks_like_hallucination(text: str, extra_substrings: tuple[str, ...] = ()) -> bool:
     normalized = _normalize_text(text)
     if normalized in _COMMON_EMPTY_AUDIO_HALLUCINATIONS:
         return True
-    if any(sub in normalized for sub in _HALLUCINATION_SUBSTRINGS):
+    substrings = _HALLUCINATION_SUBSTRINGS + tuple(
+        _normalize_text(s) for s in extra_substrings if s.strip()
+    )
+    if any(sub and sub in normalized for sub in substrings):
         return True
     return (
         len(normalized) <= 60
@@ -131,6 +134,7 @@ class Transcriber:
         raw = "".join(seg.text for seg in segments).strip()
         if not raw:
             return TranscribeResult(text="", raw=raw, status="empty")
-        if _looks_like_hallucination(raw):
+        extra = tuple(self.config.hallucination_substrings or ())
+        if _looks_like_hallucination(raw, extra):
             return TranscribeResult(text="", raw=raw, status="hallucination")
         return TranscribeResult(text=raw, raw=raw, status="ok")

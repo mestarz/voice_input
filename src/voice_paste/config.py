@@ -45,6 +45,10 @@ class Config:
     vad_min_silence_ms: int = 300  # 判定为静音切分的最短时长（越大越不易切断）
     vad_speech_pad_ms: int = 200   # 语音段前后保留的填充，避免吃掉首尾字
 
+    # 额外的幻觉短语（子串匹配，归一化后比较）。与内置默认列表合并；
+    # 遇到新的空音频幻觉时在此追加即可，无需改代码。
+    hallucination_substrings: list[str] = field(default_factory=list)
+
     # 粘贴
     paste_method: str = "auto"  # auto / wtype / ydotool / clipboard
     paste_key: str = "shift+insert"  # shift+insert / ctrl+v / ctrl+shift+v
@@ -96,6 +100,10 @@ max_seconds = 300
 vad_filter = true
 vad_min_silence_ms = 300   # 静音切分最短时长，越大越不易切断语音
 vad_speech_pad_ms = 200    # 语音段前后填充，避免吃掉首尾字
+
+# 额外幻觉短语（子串匹配）。与内置列表合并，遇到新幻觉在此追加即可。
+# 例：hallucination_substrings = ["关注我的频道", "下期再见"]
+hallucination_substrings = []
 
 # ---- 粘贴 ----
 paste_method = "auto"    # auto / wtype / ydotool / clipboard
