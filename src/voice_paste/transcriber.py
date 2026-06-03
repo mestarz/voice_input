@@ -115,6 +115,12 @@ class Transcriber:
         device, compute = self._resolve_device()
         return f"{device}/{compute}"
 
+    def _hotwords_text(self) -> str:
+        hotwords = self.config.hotwords
+        if isinstance(hotwords, str):
+            return hotwords.strip()
+        return " ".join(word.strip() for word in hotwords if word.strip())
+
     def transcribe(self, wav_path: Path) -> TranscribeResult:
         self.load()
         assert self._model is not None
@@ -123,10 +129,12 @@ class Transcriber:
             "language": language,
             "beam_size": self.config.beam_size,
             "initial_prompt": self.config.initial_prompt or None,
+            "hotwords": self._hotwords_text() or None,
             "vad_filter": self.config.vad_filter,
         }
         if self.config.vad_filter:
             transcribe_kwargs["vad_parameters"] = {
+                "min_speech_duration_ms": self.config.vad_min_speech_ms,
                 "min_silence_duration_ms": self.config.vad_min_silence_ms,
                 "speech_pad_ms": self.config.vad_speech_pad_ms,
             }

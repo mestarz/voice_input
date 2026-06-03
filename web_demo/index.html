@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Voice ASR Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="toolbar" aria-label="Voice controls">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"></span>
+          <div>
+            <h1>Voice ASR Demo</h1>
+            <p id="statusText">idle</p>
+          </div>
+        </div>
+        <button id="toggleBtn" type="button">Start</button>
+      </section>
+
+      <section class="meter" aria-label="Audio level">
+        <div id="levelBar"></div>
+      </section>
+
+      <section class="events" aria-label="Transcript events">
+        <div class="events-head">
+          <span>Transcript</span>
+          <button id="clearBtn" type="button">Clear</button>
+        </div>
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

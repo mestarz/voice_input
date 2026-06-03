@@ -1,6 +1,7 @@
 [Unit]
 Description=Voice Paste 本地语音输入助手后台服务
-After=graphical-session.target
+After=graphical-session.target voice-asr.service
+Wants=voice-asr.service
 PartOf=graphical-session.target
 
 [Service]

@@ -1,0 +1,23 @@
+[Unit]
+Description=Voice ASR faster-whisper 本机识别服务
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/voice-asr --host 127.0.0.1 --port 8765
+Restart=on-failure
+RestartSec=3
+# 首次启动需联网下载模型。若 huggingface.co 不可直连（如国内网络），
+# 取消下面注释并填入你的代理；或改用镜像 HF_ENDPOINT=https://hf-mirror.com
+#Environment=http_proxy=http://127.0.0.1:7890
+#Environment=https_proxy=http://127.0.0.1:7890
+#Environment=no_proxy=localhost,127.0.0.1
+#Environment=HF_ENDPOINT=https://hf-mirror.com
+# 已完成模型下载后，默认离线使用本地 Hugging Face 缓存，避免开机启动卡在网络元数据请求。
+Environment=HF_HUB_OFFLINE=1
+# uv tool 安装的 CUDA 12 pip 运行库；ctranslate2 GPU 推理需要这些动态库。
+Environment=LD_LIBRARY_PATH=%h/.local/share/uv/tools/voice-paste/lib/python3.12/site-packages/nvidia/cublas/lib:%h/.local/share/uv/tools/voice-paste/lib/python3.12/site-packages/nvidia/cudnn/lib:%h/.local/share/uv/tools/voice-paste/lib/python3.12/site-packages/nvidia/cuda_nvrtc/lib
+
+[Install]
+WantedBy=default.target

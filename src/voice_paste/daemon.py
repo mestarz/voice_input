@@ -16,6 +16,8 @@ import time
 from pathlib import Path
 
 from voice_paste import __version__
+from voice_paste import asr_client
+from voice_paste.asr_client import ASRServiceError
 from voice_paste.config import Config, load_config
 from voice_paste.ipc import pid_path, socket_path
 from voice_paste.notify import notify
@@ -76,11 +78,28 @@ class Daemon:
 
     def _preload_model(self) -> None:
         try:
-            print("[voice-paste] 正在预加载语音识别模型…", flush=True)
-            self.transcriber.load()
-            print(f"[voice-paste] 模型已就绪 ({self.transcriber.device_info})", flush=True)
+            if self.config.asr_backend == "local":
+                print("[voice-paste] 正在预加载本地语音识别模型…", flush=True)
+                self.transcriber.load()
+                print(
+                    f"[voice-paste] 本地模型已就绪 ({self.transcriber.device_info})",
+                    flush=True,
+                )
+                return
+
+            status = asr_client.status(self.config.asr_service_url, timeout=2.0)
+            print(
+                "[voice-paste] ASR 服务已就绪 "
+                f"({status.get('model')} {status.get('device')})",
+                flush=True,
+            )
         except Exception as exc:  # noqa: BLE001
-            print(f"[voice-paste] 模型预加载失败: {exc}", file=sys.stderr, flush=True)
+            if self.config.asr_backend == "service":
+                print(f"[voice-paste] ASR 服务连接失败: {exc}",
+                      file=sys.stderr, flush=True)
+            else:
+                print(f"[voice-paste] ASR 服务暂不可用，必要时将回退本地识别: {exc}",
+                      file=sys.stderr, flush=True)
 
     def _is_stale_or_running(self, path: Path) -> bool:
         if not path.exists():
@@ -161,7 +180,7 @@ class Daemon:
                 "state": self.state,
                 "version": __version__,
                 "model": self.config.model,
-                "device": self.transcriber.device_info,
+                "device": self._asr_device_info(),
                 "recording_seconds": (
                     round(time.time() - self._record_started_at, 1)
                     if self.state == STATE_RECORDING else 0
@@ -175,6 +194,16 @@ class Daemon:
             self._stop.set()
             return {"ok": True, "message": "daemon 正在退出"}
         return {"ok": False, "error": f"未知命令: {cmd}"}
+
+    def _asr_device_info(self) -> str:
+        if self.config.asr_backend in ("service", "auto"):
+            try:
+                status = asr_client.status(self.config.asr_service_url, timeout=0.5)
+                return f"service:{status.get('device')}"
+            except ASRServiceError:
+                if self.config.asr_backend == "service":
+                    return "service:unavailable"
+        return f"local:{self.transcriber.device_info}"
 
     # ---- 状态机 ----
     def _toggle(self) -> dict:
@@ -229,7 +258,7 @@ class Daemon:
 
         try:
             notify("正在识别…", enabled=self.config.notifications)
-            result = self.transcriber.transcribe(wav)
+            result = self._transcribe_audio(wav)
         except Exception as exc:  # noqa: BLE001
             self.last_error = str(exc)
             notify(f"识别失败: {exc}", urgency="critical",
@@ -274,6 +303,21 @@ class Daemon:
             notify(f"粘贴失败：{result.detail}", urgency="critical",
                    enabled=self.config.notifications)
         self.state = STATE_IDLE
+
+    def _transcribe_audio(self, wav: Path):
+        if self.config.asr_backend in ("service", "auto"):
+            try:
+                return asr_client.transcribe_path(
+                    self.config.asr_service_url,
+                    wav,
+                    timeout=self.config.asr_service_timeout,
+                )
+            except ASRServiceError as exc:
+                if self.config.asr_backend == "service":
+                    raise
+                print(f"[voice-paste] ASR 服务调用失败，回退本地识别: {exc}",
+                      file=sys.stderr, flush=True)
+        return self.transcriber.transcribe(wav)
 
 
 def run_daemon(preload: bool = True) -> int:

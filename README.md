@@ -15,11 +15,14 @@
 ```
 全局快捷键  ──>  voice-paste toggle  ──(unix socket)──>  voice-paste daemon
                                                           ├─ 录音 (parecord)
-                                                          ├─ 识别 (faster-whisper, GPU)
+                                                          ├─ 调用本机 ASR 服务
                                                           └─ 粘贴 (wl-copy + ydotool/wtype)
+
+voice-asr.service ──>  常驻加载 faster-whisper 模型，提供本机 HTTP API
 ```
 
-后台服务常驻内存、复用已加载的识别模型；快捷键命令只发送一个 toggle 请求。
+ASR 服务常驻内存、复用已加载的识别模型；桌面 daemon 只负责录音、调用 ASR、
+复制/粘贴。快捷键命令只发送一个 toggle 请求。
 
 ## 安装
 
@@ -97,7 +100,23 @@ uv run voice-paste doctor
 
 ## 使用
 
-### 1. 启动后台服务
+### 1. 启动 ASR 模型服务
+
+```bash
+uv run voice-asr
+```
+
+或安装为 systemd 用户服务（开机自启）：
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp src/voice_paste/systemd/voice-asr.service ~/.config/systemd/user/
+systemctl --user enable --now voice-asr.service
+```
+
+服务默认只监听本机：`http://127.0.0.1:8765`。
+
+### 2. 启动桌面后台服务
 
 ```bash
 uv run voice-paste daemon
@@ -111,7 +130,7 @@ cp src/voice_paste/systemd/voice-paste.service ~/.config/systemd/user/
 systemctl --user enable --now voice-paste.service
 ```
 
-### 2. 绑定全局快捷键
+### 3. 绑定全局快捷键
 
 在桌面环境（GNOME / KDE / Hyprland / Sway 等）把一个快捷键（如 `Super+Space`）绑定到：
 
@@ -125,7 +144,7 @@ Hyprland 示例（`~/.config/hypr/hyprland.conf`）：
 bind = SUPER, SPACE, exec, voice-paste toggle
 ```
 
-### 3. 日常使用
+### 4. 日常使用
 
 1. 点进任意输入框
 2. 按快捷键 → 开始录音（出现“开始录音 🎙”通知）
@@ -142,6 +161,7 @@ bind = SUPER, SPACE, exec, voice-paste toggle
 | `voice-paste doctor` | 环境自检 |
 | `voice-paste config [--init]` | 查看配置 /（`--init`）生成默认配置文件 |
 | `voice-paste stop` | 停止后台服务 |
+| `voice-asr` | 启动本机 ASR 模型服务 |
 
 ## 配置
 
@@ -149,6 +169,15 @@ bind = SUPER, SPACE, exec, voice-paste toggle
 生成模板：`voice-paste config --init`。
 
 ```toml
+asr_backend = "auto"     # auto / service / local
+asr_service_url = "http://127.0.0.1:8765"
+asr_service_timeout = 120.0
+realtime_enabled = true
+realtime_host = "127.0.0.1"
+realtime_port = 8766
+realtime_vad_threshold = 0.5
+realtime_max_utterance_seconds = 30.0
+
 model = "large-v3"      # tiny/base/small/medium/large-v3
 device = "auto"          # auto / cuda / cpu
 compute_type = "default" # default / float16 / int8_float16 / int8
@@ -159,6 +188,11 @@ sample_rate = 16000
 channels = 1
 max_seconds = 300        # 录音安全上限，超时自动停止识别
 
+vad_filter = true
+vad_min_speech_ms = 200
+vad_min_silence_ms = 700
+vad_speech_pad_ms = 200
+
 paste_method = "auto"    # auto / wtype / ydotool / clipboard
 paste_key = "shift+insert"  # shift+insert / ctrl+v / ctrl+shift+v
 auto_paste = true
@@ -166,6 +200,49 @@ paste_delay_ms = 120
 
 notifications = true
 ```
+
+`asr_backend = "auto"` 会优先调用 `voice-asr` 服务；服务不可用时回退到旧的
+进程内本地识别。若要强制所有项目共用同一个模型服务，可改为
+`asr_backend = "service"`。
+
+## 实时语音接口
+
+`voice-asr` 默认同时启动实时 WebSocket：
+
+```text
+ws://127.0.0.1:8766/realtime
+```
+
+客户端持续发送 binary frame，格式固定为 PCM signed 16-bit little-endian、
+16 kHz、单声道。服务端用 Silero VAD 自动切句，返回 JSON 事件：
+
+```json
+{"type": "ready", "sample_rate": 16000, "sample_width": 2, "channels": 1}
+{"type": "speech_start", "speech_prob": 0.8123}
+{"type": "speech_end", "audio_ms": 2340}
+{"type": "transcript_final", "text": "打开浏览器", "status": "ok", "audio_ms": 2340}
+```
+
+客户端也可以发送文本 JSON 命令：
+
+```json
+{"type": "flush"}
+{"type": "end"}
+```
+
+这个接口只负责“音频流 → VAD 切句 → ASR 文本事件”。WhatsApp、Web 页面、
+工具调用等业务服务应消费 `transcript_final` 事件，而不是耦合进语音服务。
+
+仓库内提供了一个最小 Web demo：
+
+```bash
+cd web_demo
+python -m http.server 8787 --bind 127.0.0.1
+```
+
+然后打开 `http://127.0.0.1:8787/`，点击 Start 后即可通过浏览器麦克风把
+实时切分后的识别文本打印到页面上。这个 demo 不判断用户是否说完，只验证语音
+切分和 ASR 输出链路。
 
 ## 行为与可靠性
 

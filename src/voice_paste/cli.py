@@ -156,6 +156,19 @@ def _cmd_doctor(_args: argparse.Namespace) -> int:
         cuda_detail = f"ctranslate2 不可用: {exc}"
     _check("CUDA GPU 加速", cuda_ok, cuda_detail)
 
+    cfg = load_config()
+    print("\nASR 服务:")
+    _check("voice-asr 命令", bool(shutil.which("voice-asr")),
+           shutil.which("voice-asr") or "开发模式可用: uv run voice-asr")
+    try:
+        from voice_paste import asr_client
+        s = asr_client.status(cfg.asr_service_url, timeout=2.0)
+        detail = f"{s.get('model')} [{s.get('device')}]"
+        _check("本机 ASR 服务", bool(s.get("ok")), detail)
+    except Exception as exc:  # noqa: BLE001
+        _check("本机 ASR 服务", False,
+               f"未连接: {exc}; 执行: systemctl --user start voice-asr.service")
+
     print("\n后台服务:")
     _check("daemon 运行中", ipc.daemon_running(),
            "已连接" if ipc.daemon_running() else "未运行，执行: voice-paste daemon")

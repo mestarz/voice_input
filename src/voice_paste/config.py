@@ -23,6 +23,19 @@ def config_path() -> Path:
 
 @dataclass
 class Config:
+    # ASR 调用模式：
+    # - auto：优先调用本机 ASR 服务，失败时回退到当前进程本地识别
+    # - service：只调用本机 ASR 服务
+    # - local：保持旧行为，在当前 daemon 进程内加载 faster-whisper
+    asr_backend: str = "auto"
+    asr_service_url: str = "http://127.0.0.1:8765"
+    asr_service_timeout: float = 120.0
+    realtime_enabled: bool = True
+    realtime_host: str = "127.0.0.1"
+    realtime_port: int = 8766
+    realtime_vad_threshold: float = 0.5
+    realtime_max_utterance_seconds: float = 30.0
+
     # 语音识别（faster-whisper）
     model: str = "large-v3"
     device: str = "auto"  # auto / cuda / cpu
@@ -32,6 +45,8 @@ class Config:
     # 引导提示：给一段带标点的中文示例可显著提升标点/数字格式输出。
     # 留空字符串表示不使用。
     initial_prompt: str = "以下是普通话的句子，请根据语气正确使用逗号、句号、问号、感叹号等标点符号。"
+    # 热词：提高专有名词、项目名、人名、工具名的识别概率。
+    hotwords: list[str] = field(default_factory=list)
     download_root: str | None = None  # 模型缓存目录，None 用 HF 默认
 
     # 录音
@@ -42,7 +57,8 @@ class Config:
     # VAD（语音活动检测）：过滤静音段，避免空音频幻觉。
     # 默认值较默认 VAD 更宽松，减少短句/轻声被整段切掉导致的“识别失败”。
     vad_filter: bool = True
-    vad_min_silence_ms: int = 300  # 判定为静音切分的最短时长（越大越不易切断）
+    vad_min_speech_ms: int = 200   # 至少持续这么久才判定为有效语音
+    vad_min_silence_ms: int = 700  # 静音超过这么久判定当前说话结束
     vad_speech_pad_ms: int = 200   # 语音段前后保留的填充，避免吃掉首尾字
 
     # 额外的幻觉短语（子串匹配，归一化后比较）。与内置默认列表合并；
@@ -82,6 +98,15 @@ DEFAULT_CONFIG_TEMPLATE = """\
 # 所有项均可省略，省略时使用默认值。
 
 # ---- 语音识别 ----
+asr_backend = "auto"     # auto / service / local
+asr_service_url = "http://127.0.0.1:8765"
+asr_service_timeout = 120.0
+realtime_enabled = true
+realtime_host = "127.0.0.1"
+realtime_port = 8766
+realtime_vad_threshold = 0.5
+realtime_max_utterance_seconds = 30.0
+
 model = "large-v3"      # tiny/base/small/medium/large-v3 等
 device = "auto"          # auto / cuda / cpu
 compute_type = "default" # default / float16 / int8_float16 / int8
@@ -89,6 +114,8 @@ language = "zh"          # 识别语言；留空字符串表示自动检测
 beam_size = 5
 # 引导提示：带标点的中文示例可提升标点输出。留空字符串则不使用。
 initial_prompt = "以下是普通话的句子，请根据语气正确使用逗号、句号、问号、感叹号等标点符号。"
+# 热词：提高专有名词、项目名、人名、工具名的识别概率。
+hotwords = ["Codex", "OpenAI", "faster-whisper", "Voice Paste", "语音屏幕解析", "实时对话"]
 
 # ---- 录音 ----
 sample_rate = 16000
@@ -98,7 +125,8 @@ max_seconds = 300
 # ---- VAD（语音活动检测）----
 # 过滤静音以减少空音频幻觉；放宽参数可减少短句被误切导致的“识别失败”。
 vad_filter = true
-vad_min_silence_ms = 300   # 静音切分最短时长，越大越不易切断语音
+vad_min_speech_ms = 200    # 至少持续这么久才判定为有效语音
+vad_min_silence_ms = 700   # 静音超过这么久判定当前说话结束
 vad_speech_pad_ms = 200    # 语音段前后填充，避免吃掉首尾字
 
 # 额外幻觉短语（子串匹配）。与内置列表合并，遇到新幻觉在此追加即可。
